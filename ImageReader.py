@@ -18,7 +18,7 @@ def LoadImages(ImageName,Im_Hight,Im_Width,SamplingRate): # load image and retur
 #############################################################################################################################################
 def CreateSampledImage(I,SamplingRate): #Sparsely sample pixels from image I for training
     Sy, Sx, t = I.shape
-    SampleMap = (np.random.rand(Sy, Sx,1) > 1-np.random.rand()*SamplingRate)
+    SampleMap = (np.random.rand(Sy, Sx,1) < SamplingRate)
     ii = np.concatenate([SampleMap, SampleMap, SampleMap], axis=2)
     SparseIm=I.copy()
     SparseIm[ii==False]=0
