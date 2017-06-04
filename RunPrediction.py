@@ -62,8 +62,8 @@ def main(argv=None):
         saver.restore(sess, ckpt.model_checkpoint_path)
         print("Model restored...")
     else:
-        print("Error no trained model find in log dir"+logs_dir+"For creating trained model see: Train.py")
-        os.exit()
+        print("Error no trained model found in log dir "+logs_dir+"For creating trained model see: Train.py")
+        return
 
 
 #..............Start image reconstruction....................................................................
