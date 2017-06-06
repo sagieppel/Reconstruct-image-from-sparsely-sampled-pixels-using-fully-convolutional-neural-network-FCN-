@@ -1,6 +1,7 @@
 # Reconstruct image from sparsely sampled pixels using fully convolutional neural network (FCN)
  
-Take image in which only small fraction of the pixels are known and reconstruct (upsample) the full image using fully convolutional neural net (tensorflow implementation).  
+Take image in which only small fraction of the pixels are known and reconstruct (upsample) the full image using fully convolutional neural net (tensorflow implementation).  This is simple implementation for more advance implementation using vavlve filters see: https://github.com/sagieppel/Reconstruct-image-from-sparsely-sampled-pixels-using-fully-convolutional-neural-network-FCN-with-v
+
 ![](/Image1.png)  ![](/Scheme.png)
 ## Instructions
 ### Training: 
