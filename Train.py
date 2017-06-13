@@ -33,7 +33,7 @@ TrainLossTxtFile=logs_dir+"TrainLoss.txt"#
 
 
 
-MAX_ITERATION = int(100000) #Maximal training iteration
+MAX_ITERATION = int(60000) #Maximal training iteration
 
 if not os.path.exists(logs_dir): os.makedirs(logs_dir)
 
@@ -48,8 +48,8 @@ def main(argv=None):
     keep_probability = tf.placeholder(tf.float32, name="keep_probabilty") #Dropout probability
     Sparse_Sampled_Image = tf.placeholder(tf.float32, shape=[None, None, None, 3], name="input_Sparse_image") #Input image sparsly sampled image
     Full_Image = tf.placeholder(tf.float32, shape=[None, None, None, 3], name="Full_image")  # Full image all pixels filled
-
-    ReconstructImage = BuildNet.inference(Sparse_Sampled_Image,keep_probability,3,Vgg_Model_Dir )# Here the graph(net) is builded
+    Binary_Point_Map = tf.placeholder(tf.float32, shape=[None, None, None, 1], name="Binary_Point_Map") # Binary image with all the sample point marked as 1 and the rest of the pixels are 0, hence binary map of sampled point
+    ReconstructImage = BuildNet.inference(Sparse_Sampled_Image,Binary_Point_Map,keep_probability,3,Vgg_Model_Dir )# Here the graph(net) is builded
     loss =tf.reduce_mean(tf.abs(ReconstructImage - Full_Image, name="L1_Loss"))  # Define loss function for training as the difference between reconstruct image and ground truth image
 
 
@@ -100,16 +100,18 @@ def main(argv=None):
         batch_size=np.min([Batch_Size,len(TrainImages)-Nimg])
         FullImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
         SparseSampledImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
+        BinarySamplesMap = np.zeros([batch_size, Im_Hight, Im_Width, 1], dtype=np.int)
         for fi in range(batch_size):
-            FullImages[fi],SparseSampledImages[fi]=ImageReader.LoadImages(Train_Image_Dir +TrainImages[Nimg],Im_Hight,Im_Width,SamplingRate)
+            FullImages[fi],SparseSampledImages[fi],BinarySamplesMap[fi]=ImageReader.LoadImages(Train_Image_Dir +TrainImages[Nimg],Im_Hight,Im_Width,SamplingRate)
             Nimg+=1
 
+
 #.......................Run one batch of training...............................................................................
-        feed_dict = {Sparse_Sampled_Image: SparseSampledImages, Full_Image: FullImages, keep_probability: 0.4+np.random.rand()*0.6}# Run one cycle of traning
+        feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 0.6+np.random.rand()*0.4}# Run one cycle of traning
         sess.run(train_op, feed_dict=feed_dict)
 #......................Write training set loss..........................................................................
         if itr % 10==0:
-            feed_dict = {Sparse_Sampled_Image: SparseSampledImages, Full_Image: FullImages,keep_probability: 1}
+            feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages,keep_probability: 1}
             train_loss= sess.run(loss, feed_dict=feed_dict)
             print("Step: %d, Train_loss:%g " % (itr, train_loss))
           #  summary_writer.add_summary(summary_str, itr)

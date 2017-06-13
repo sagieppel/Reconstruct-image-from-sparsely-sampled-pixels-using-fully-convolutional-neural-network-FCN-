@@ -10,17 +10,18 @@ def LoadImages(ImageName,Im_Hight,Im_Width,SamplingRate): # load image and retur
     if Im_Hight>0 and Im_Width>0:
         Img = misc.imresize(Img, [Im_Hight,Im_Width], interp='bilinear')
     Img=Img[:,:,0:3]
-    SampledImage=CreateSampledImage(Img,SamplingRate)
+    SampledImage,BinarySampleMap,=CreateSampledImage(Img,SamplingRate)
     Img= np.expand_dims(Img, axis=0)
     SampledImage = np.expand_dims(SampledImage, axis=0)
-    return Img,SampledImage
+    BinarySampleMap = np.expand_dims(BinarySampleMap, axis=0)
+    return Img,SampledImage,BinarySampleMap
 
 #############################################################################################################################################
 def CreateSampledImage(I,SamplingRate): #Sparsely sample pixels from image I for training
     Sy, Sx, t = I.shape
-    SampleMap = (np.random.rand(Sy, Sx,1) > 1-np.random.rand()*SamplingRate)
+    SampleMap = (np.random.rand(Sy, Sx,1) <SamplingRate)
     ii = np.concatenate([SampleMap, SampleMap, SampleMap], axis=2)
     SparseIm=I.copy()
     SparseIm[ii==False]=0
-    return SparseIm
+    return SparseIm,SampleMap
 #

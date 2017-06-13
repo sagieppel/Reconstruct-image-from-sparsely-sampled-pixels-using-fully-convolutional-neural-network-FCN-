@@ -1,4 +1,4 @@
-#Script for training network for recosttucting image from sparsly sample pixels
+#Script for training network for recosttucting image from sparsly sample pixels using valve filters
 #Hence take image in which only small fraction of the pixels are known and reconstruct the full image
 #The unknown pixels are marked as 0
 
@@ -6,7 +6,7 @@
 #Assume that you already have trained model in log_dir, if you dont have trained model see: trained.py for training
 #Set folder with  images in: Image_Dir
 #Set Sampling rate (hence fraction of pixels) sampled from each image in: SamplingRate
-#If the images are already sampled (hence most pixels are zero) set SamplingRate=1
+#If your image are already sampled change the reader to read the binary sampling map and the sample image
 #Set the directory in which you want the output image to appear to: OUTPUT_Dir
 #Run
 
@@ -20,8 +20,8 @@ import os
 import scipy.misc as misc
 import random
 
-Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/training/"# Directory with image to train
-OUTPUT_Dir="/home/sagi/Desktop/Predictions/"# Directory with image to train
+Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/validation/"# Directory with image to train
+OUTPUT_Dir="/home/sagi/Desktop/PredictionsValveFilters50k_5x5Filters/"# Directory with image to train
 SamplingRate=0.1 # Fraction of pixels to be sampled from image for training
 
 logs_dir="logs/" # Were the trained model and all output will be put
@@ -36,8 +36,8 @@ if not os.path.exists(OUTPUT_Dir): os.makedirs(OUTPUT_Dir)
 def main(argv=None):
     keep_probability = tf.placeholder(tf.float32, name="keep_probabilty") #Dropout probability
     Sparse_Sampled_Image = tf.placeholder(tf.float32, shape=[None, None, None, 3], name="input_Sparse_image") #Input image sparsly sampled image
-
-    ReconstructImage = BuildNet.inference(Sparse_Sampled_Image,keep_probability,3,Vgg_Model_Dir )# Here the graph(net) is builded
+    Binary_Point_Map = tf.placeholder(tf.float32, shape=[None, None, None, 1],name="Binary_Point_Map")  # Binary image with all the sample point marked as 1 and the rest of the pixels are 0, hence binary map of sampled point
+    ReconstructImage = BuildNet.inference(Sparse_Sampled_Image, Binary_Point_Map, keep_probability, 3,Vgg_Model_Dir)  # Here the graph(net) is builded
 
     print("Reading images list")
 #---------------------Read list of image for recostruction------------------------------------------------------------
@@ -62,25 +62,30 @@ def main(argv=None):
         saver.restore(sess, ckpt.model_checkpoint_path)
         print("Model restored...")
     else:
-        print("Error no trained model find in log dir"+logs_dir+"For creating trained model see: Train.py")
-        os.exit()
+        print("Error no trained model found in log dir "+logs_dir+"  For creating trained model see: Train.py")
+        return
 
-
+    SumLoss=0
 #..............Start image reconstruction....................................................................
     for itr in range(len(Images)):
 #.....................Load images for prediction-------------------------------------
         print(str(itr)+") Reconstructing: "+Image_Dir +Images[itr])
-        FullImage,SparseSampledImage=ImageReader.LoadImages(Image_Dir +Images[itr],0,0,SamplingRate)
+
+        FullImage,SparseSampledImage,BinarySamplesMap=ImageReader.LoadImages(Image_Dir +Images[itr],0,0,SamplingRate)
 
 #.......................Run one  prediction...............................................................................
-        feed_dict = {Sparse_Sampled_Image: SparseSampledImage, keep_probability: 1}# Run one cycle of traning
+        feed_dict = {Sparse_Sampled_Image: SparseSampledImage,Binary_Point_Map:BinarySamplesMap, keep_probability: 1}# Run one cycle of traning
         ReconImage=sess.run(ReconstructImage, feed_dict=feed_dict)# run image reconstruction using network
 #......................Save image..........................................................................
         #ReconImage[ReconImage>255]=255
         #ReconImage[ReconImage<0]=0
+        loss=np.mean(np.abs(ReconImage[0]-FullImage[0]))
+        SumLoss+=loss
+        print("Loss="+str(loss)+"        Mean loss="+str(SumLoss/(itr+1)))
         misc.imsave(OUTPUT_Dir+"/"+Images[itr][0:-4]+"_Reconstructed"+Images[itr][-4:],ReconImage[0])
         misc.imsave(OUTPUT_Dir + "/" + Images[itr][0:-4] + "_Original" + Images[itr][-4:], FullImage[0])
         misc.imsave(OUTPUT_Dir + "/" + Images[itr][0:-4] + "_Sampled" + Images[itr][-4:], SparseSampledImage[0])
+        misc.imsave(OUTPUT_Dir + "/" + Images[itr][0:-4] + "_BinaryMap" + Images[itr][-4:], BinarySamplesMap[0,:,:,0])
 
 print("Finished Running")
 if __name__ == "__main__":

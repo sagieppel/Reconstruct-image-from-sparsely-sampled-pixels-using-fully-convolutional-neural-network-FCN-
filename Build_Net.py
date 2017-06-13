@@ -13,25 +13,47 @@ def loadWeights(i,weights,LayerName):
     kernels = utils.get_variable(np.transpose(kernels, (1, 0, 2, 3)),name=LayerName+"_w")  # Transform the np weight matrix to tf matrix that will be used, as the conv layer shape and intial weights, Set the shape of convlutional layer based on the weight matrix and load it as tf matrix,
     bias = utils.get_variable(bias.reshape(-1), name=LayerName+"_b")  # Transform biase matrix to tensorflow arrays
     return kernels, bias
+#################################Load Weight for one layer input (second input)##################################################################################
+def loadWeightsFlat(i,weights,LayerName):
+    kernels, bias = weights[i][0][0][0][0]
+    kernels=kernels[:, :, 1, :] # The original layer is for input depth 3 this is for input depth of 1
+    kernels = np.expand_dims(kernels, axis=2)
+    # matconvnet: weights are [width, height, in_channels, out_channels]
+    # tensorflow: weights are [height, width, in_channels, out_channels]
+    kernels = utils.get_variable(np.transpose(kernels, (1, 0, 2, 3)),name=LayerName+"_w")  # Transform the np weight matrix to tf matrix that will be used, as the conv layer shape and intial weights, Set the shape of convlutional layer based on the weight matrix and load it as tf matrix,
+    bias = utils.get_variable(bias.reshape(-1), name=LayerName+"_b")  # Transform biase matrix to tensorflow arrays
+    return kernels, bias
 
 
-
-###################################Build VGG Encoder with additional depth 1 input#################################################################################
+###################################Build VGG Encoder with additional input#################################################################################
 ##########################VGG Build VGG encoder layer by layer##################################################################
-def Build_vgg_net(weights, image): #Build and load vgg net from weights and input image, not that weight define shape of convolution as well as they weight if you want to change this you might want to change this
+def Build_vgg_net(weights, Sampled_image,Binary_Point_Map): #Build and load vgg net from weights and input image, not that weight define shape of convolution as well as they weight if you want to change this you might want to change this
 
 
     net = {}  # Dictionary that will contain all layers associate with their names (note the names are layers name and layers are tf layers)
     #***************************LAYER 1**********************************************************************************************************
     #-------------------------------Conv1_1---------------------------------------------------------------------------------------------------------
-    kernels, bias = loadWeights(0,weights,"conv1_1")
+    #kernels, bias = loadWeights(0,weights,"conv1_1_img")
+    kernels = utils.weight_variable([5, 5, 3, 64],name="conv1_1_Img_w")  # Create tf weight for the new layer with initial weights with normal random distrubution mean zero and std 0.02
+    bias = utils.bias_variable([64], name="conv1_1_Img_b")
     #current = utils.conv2d_basic(current, kernels,bias)  # set Conv layer  with loaded weights and biases note that the current layer is both input and ouput
-    conv1_1 = tf.nn.bias_add(tf.nn.conv2d(image, kernels, strides=[1, 1, 1, 1],padding="SAME"),bias)  # Padding same mean the output is same size as input?
+    conv1_1_img = tf.nn.bias_add(tf.nn.conv2d(Sampled_image, kernels, strides=[1, 1, 1, 1],padding="SAME"),bias)  # Padding same mean the output is same size as input?
+    relu1_1_img = tf.nn.relu(conv1_1_img, name="relu1_1_img")
+    #------------------------Conv1_1_b For Second Input---------------------------------------------------------------------
+    #kernels, bias = loadWeightsFlat(0, weights, "conv1_1_Valve")
+    kernels = utils.weight_variable([5, 5, 1, 64], name="conv1_1_Valve_w")  # Create tf weight for the new layer with initial weights with normal random distrubution mean zero and std 0.02
+    bias = utils.bias_variable([64], name="conv1_1_Valve_b")
+    # current = utils.conv2d_basic(current, kernels,bias)  # set Conv layer  with loaded weights and biases note that the current layer is both input and ouput
+    conv1_1_Valve = tf.nn.bias_add(tf.nn.conv2d(Binary_Point_Map, kernels, strides=[1, 1, 1, 1], padding="SAME"),bias)  # Padding same mean the output is same size as input?
+    relu1_1_Valve = tf.nn.relu(conv1_1_Valve, name="relu1_1_Valve")
+    relu1_1=relu1_1_Valve*relu1_1_img #multiply response of valve filter in response of image filter
+    #conv1_1=conv1_1_b+conv1_1_a
+    #conv1_1=tf.add(conv1_1_b,conv1_1_a,name="conv1_1")
 
-
-    net["conv1_1"] = conv1_1
+    #conv1_1 = conv1_1_b * conv1_1_a
+    #conv1_1=tf.multiply(conv1_1_b,conv1_1_a,name="conv1_1")
+    #net["conv1_1"] = conv1_1
     #--------------------------Relu1_1----------------------------------------------------------------------------------------------------------------
-    relu1_1 = tf.nn.relu(conv1_1, name="relu1_1")
   #  if FLAGS.debug: utils.add_activation_summary(conv1_1)
     net["relu1_1"] = relu1_1  # load layer to the net dictionary according to its name (this not essential but make it easy to extract specific layer for future mendling)
     # -------------------------------Conv1_2---------------------------------------------------------------------------------------------------------
@@ -40,9 +62,9 @@ def Build_vgg_net(weights, image): #Build and load vgg net from weights and inpu
     net["conv1_2"] = conv1_2
     # --------------------------Relu1_1----------------------------------------------------------------------------------------------------------------
     relu1_2 = tf.nn.relu(conv1_2, name="relu1_2")
-    net["relu1_2"] = relu1_2
+    net["relu1_2"] = relu1_1
     #--------------------------- Pool 1----------------------------------------------------------------------------------------------------------
-    pool1=tf.nn.avg_pool(relu1_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    pool1=tf.nn.max_pool(relu1_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net["pool1"] = pool1
     #-----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -65,7 +87,7 @@ def Build_vgg_net(weights, image): #Build and load vgg net from weights and inpu
     relu2_2 = tf.nn.relu(conv2_2, name="relu2_2")
     net["relu2_2"] = relu2_2
     # --------------------------- Pool 1----------------------------------------------------------------------------------------------------------
-    pool2 = tf.nn.avg_pool(relu2_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    pool2 = tf.nn.max_pool(relu2_2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net["pool2"] = pool2
     #-----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -99,7 +121,7 @@ def Build_vgg_net(weights, image): #Build and load vgg net from weights and inpu
     relu3_4 = tf.nn.relu(conv3_4, name="relu3_4")
     net["relu3_4"] = relu3_4
     # --------------------------- Pool 1----------------------------------------------------------------------------------------------------------
-    pool3 = tf.nn.avg_pool(relu3_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    pool3 = tf.nn.max_pool(relu3_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net["pool3"] = pool3
     # -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -134,7 +156,7 @@ def Build_vgg_net(weights, image): #Build and load vgg net from weights and inpu
     relu4_4 = tf.nn.relu(conv4_4, name="relu4_4")
     net["relu4_4"] = relu4_4
     # --------------------------- Pool 1----------------------------------------------------------------------------------------------------------
-    pool4 = tf.nn.avg_pool(relu4_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    pool4 = tf.nn.max_pool(relu4_4, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net["pool4"] = pool4
     # -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -173,12 +195,12 @@ def Build_vgg_net(weights, image): #Build and load vgg net from weights and inpu
 
     return net #Return array with all
 ###########################################################################################################################################################
-def inference(image, keep_prob, NUM_OF_CLASSESS,model_dir):
+def inference(Sampled_image,Binary_Point_Map, keep_prob, Num_Channels,model_dir):
     # Build network and load initial weights
     #image: tf  tensor of the input image
     #keep_prob: Probabality for dropout only applied during training
     """
-    Semantic segmentation network definition
+    
     :param image: input image. Should have values in range 0-255
     :param keep_prob:
     :return:
@@ -192,11 +214,11 @@ def inference(image, keep_prob, NUM_OF_CLASSESS,model_dir):
 
     weights = np.squeeze(model_data['layers'])
 
-    processed_image = utils.process_image(image, mean_pixel)# Substract mean from every pixel, nothing more
+    processed_image = utils.process_image(Sampled_image, mean_pixel)# Substract mean from every pixel, nothing more
 
     with tf.variable_scope("inference"):
         #image_net =Build_vgg_net_using_loop(weights, processed_image)
-        image_net = Build_vgg_net(weights, processed_image) #This is were the encoder i.e the VGG net is built and loaded from pretrained  VGG net
+        image_net = Build_vgg_net(weights, processed_image,Binary_Point_Map) #This is were the encoder i.e the VGG net is built and loaded from pretrained  VGG net
         conv_final_layer = image_net["conv5_3"] #Continue the decoder from the last layer of the vgg encoder
 
         pool5 = utils.max_pool_2x2(conv_final_layer)
@@ -215,14 +237,14 @@ def inference(image, keep_prob, NUM_OF_CLASSESS,model_dir):
         #if FLAGS.debug: utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob) # Another dropout need to be used only for training
 
-        W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSESS], name="W8") # Basically the output num of classes imply the output is already the prediction this is flexible can be change however in multinet class number of 2 give good results
-        b8 = utils.bias_variable([NUM_OF_CLASSESS], name="b8")
+        W8 = utils.weight_variable([1, 1, 4096, Num_Channels], name="W8") # Basically the output num of classes imply the output is already the prediction this is flexible can be change however in multinet class number of 2 give good results
+        b8 = utils.bias_variable([Num_Channels], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
         # annotation_pred1 = tf.argmax(conv8, dimension=3, name="prediction1")
 
         # now to upscale to actual image size
         deconv_shape1 = image_net["pool4"].get_shape() # Set the output shape for the the transpose convolution output take only the depth since the transpose convolution will have to have the same depth for output
-        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSESS], name="W_t1") # Deconvolution/transpose in size 4X4 note that the output shape is of  depth NUM_OF_CLASSES this is not necessary in will need to be fixed if you only have 2 catagories
+        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, Num_Channels], name="W_t1") # Deconvolution/transpose in size 4X4 note that the output shape is of  depth NUM_OF_CLASSES this is not necessary in will need to be fixed if you only have 2 catagories
         b_t1 = utils.bias_variable([deconv_shape1[3].value], name="b_t1")
         conv_t1 = utils.conv2d_transpose_strided(conv8, W_t1, b_t1, output_shape=tf.shape(image_net["pool4"])) # Use strided convolution to double layer size (depth is the depth of pool4 for the later element wise addition
         fuse_1 = tf.add(conv_t1, image_net["pool4"], name="fuse_1") # Add element wise the pool layer from the decoder
@@ -233,16 +255,14 @@ def inference(image, keep_prob, NUM_OF_CLASSESS,model_dir):
         conv_t2 = utils.conv2d_transpose_strided(fuse_1, W_t2, b_t2, output_shape=tf.shape(image_net["pool3"]))
         fuse_2 = tf.add(conv_t2, image_net["pool3"], name="fuse_2")
 
-        shape = tf.shape(image)
-        #deconv_shape3 = tf.pack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS]) #Set shape of the final deconvlution layer (shape of image depth number of class)
-        W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSESS, deconv_shape2[3].value], name="W_t3")
-        b_t3 = utils.bias_variable([NUM_OF_CLASSESS], name="b_t3")
-       # conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
-        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=[shape[0], shape[1], shape[2], NUM_OF_CLASSESS], stride=8)
-        #FinalImage=tf.cast(conv_t3, tf.uint8,  name="ReconImage") %For 3d reconstrunction
+        shape = tf.shape(Sampled_image)
+        # deconv_shape3 = tf.pack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS]) #Set shape of the final deconvlution layer (shape of image depth number of class)
+        W_t3 = utils.weight_variable([16, 16, Num_Channels, deconv_shape2[3].value], name="W_t3")
+        b_t3 = utils.bias_variable([Num_Channels], name="b_t3")
+        # conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3,output_shape=[shape[0], shape[1], shape[2], Num_Channels], stride=8)
+        # FinalImage=tf.cast(conv_t3, tf.uint8,  name="ReconImage") %For 3d reconstrunction
 
-
-
-    return  conv_t3
+    return conv_t3
 
 ###########################################################################################################################################################
