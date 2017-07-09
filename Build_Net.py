@@ -195,7 +195,7 @@ def Build_vgg_net(weights, Sampled_image,Binary_Point_Map): #Build and load vgg 
 
     return net #Return array with all
 ###########################################################################################################################################################
-def inference(Sampled_image,Binary_Point_Map, keep_prob, Num_Channels,model_dir):
+def inference(Sampled_image,Binary_Point_Map, keep_prob, model_dir, NumOutputChannels=3,Num_Mid_Channels=60,):
     # Build network and load initial weights
     #image: tf  tensor of the input image
     #keep_prob: Probabality for dropout only applied during training
@@ -237,14 +237,14 @@ def inference(Sampled_image,Binary_Point_Map, keep_prob, Num_Channels,model_dir)
         #if FLAGS.debug: utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob) # Another dropout need to be used only for training
 
-        W8 = utils.weight_variable([1, 1, 4096, Num_Channels], name="W8") # Basically the output num of classes imply the output is already the prediction this is flexible can be change however in multinet class number of 2 give good results
-        b8 = utils.bias_variable([Num_Channels], name="b8")
+        W8 = utils.weight_variable([1, 1, 4096, Num_Mid_Channels], name="W8") # Basically the output num of classes imply the output is already the prediction this is flexible can be change however in multinet class number of 2 give good results
+        b8 = utils.bias_variable([Num_Mid_Channels], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
         # annotation_pred1 = tf.argmax(conv8, dimension=3, name="prediction1")
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------
         # now to upscale to actual image size
         deconv_shape1 = image_net["pool4"].get_shape() # Set the output shape for the the transpose convolution output take only the depth since the transpose convolution will have to have the same depth for output
-        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, Num_Channels], name="W_t1") # Deconvolution/transpose in size 4X4 note that the output shape is of  depth NUM_OF_CLASSES this is not necessary in will need to be fixed if you only have 2 catagories
+        W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, Num_Mid_Channels], name="W_t1") # Deconvolution/transpose in size 4X4 note that the output shape is of  depth NUM_OF_CLASSES this is not necessary in will need to be fixed if you only have 2 catagories
         b_t1 = utils.bias_variable([deconv_shape1[3].value], name="b_t1")
         conv_t1 = utils.conv2d_transpose_strided(conv8, W_t1, b_t1, output_shape=tf.shape(image_net["pool4"])) # Use strided convolution to double layer size (depth is the depth of pool4 for the later element wise addition
         fuse_1 = tf.add(conv_t1, image_net["pool4"], name="fuse_1") # Add element wise the pool layer from the decoder
@@ -255,14 +255,35 @@ def inference(Sampled_image,Binary_Point_Map, keep_prob, Num_Channels,model_dir)
         conv_t2 = utils.conv2d_transpose_strided(fuse_1, W_t2, b_t2, output_shape=tf.shape(image_net["pool3"]))
         fuse_2 = tf.add(conv_t2, image_net["pool3"], name="fuse_2")
 
-        shape = tf.shape(Sampled_image)
-        # deconv_shape3 = tf.pack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS]) #Set shape of the final deconvlution layer (shape of image depth number of class)
-        W_t3 = utils.weight_variable([16, 16, Num_Channels, deconv_shape2[3].value], name="W_t3")
-        b_t3 = utils.bias_variable([Num_Channels], name="b_t3")
-        # conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
-        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3,output_shape=[shape[0], shape[1], shape[2], Num_Channels], stride=8)
-        # FinalImage=tf.cast(conv_t3, tf.uint8,  name="ReconImage") %For 3d reconstrunction
+        deconv_shape3 = image_net["pool2"].get_shape()
+        W_t3 = utils.weight_variable([4, 4, deconv_shape3[3].value, deconv_shape2[3].value], name="W_t3")
+        b_t3 = utils.bias_variable([deconv_shape3[3].value], name="b_t3")
+        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=tf.shape(image_net["pool2"]))
+        fuse_3 = tf.add(conv_t3, image_net["pool2"], name="fuse_3")
 
-    return conv_t3
+        deconv_shape4 = image_net["pool1"].get_shape()
+        W_t4 = utils.weight_variable([4, 4, deconv_shape4[3].value, deconv_shape3[3].value], name="W_t4")
+        b_t4 = utils.bias_variable([deconv_shape4[3].value], name="b_t4")
+        conv_t4 = utils.conv2d_transpose_strided(fuse_3, W_t4, b_t4, output_shape=tf.shape(image_net["pool1"]))
+        fuse_4 = tf.add(conv_t4, image_net["pool1"], name="fuse_4")
+
+        deconv_shape5 = image_net["relu1_2"].get_shape()
+        W_t5 = utils.weight_variable([4, 4, deconv_shape5[3].value, deconv_shape4[3].value], name="W_t5")
+        b_t5 = utils.bias_variable([deconv_shape5[3].value], name="b_t5")
+        conv_t5 = utils.conv2d_transpose_strided(fuse_4, W_t5, b_t5, output_shape=tf.shape(image_net["relu1_2"]))
+        fuse_5 = tf.add(conv_t5, image_net["relu1_2"], name="fuse_5")
+
+        WFinal=tf.truncated_normal([1,1,deconv_shape5[3],NumOutputChannels],mean=0,stddev=0.1,DType=tf.float32)
+        BFinal = tf.truncated_normal([NumOutputChannels], mean=0, stddev=0.1, DType=tf.float32)
+        ReconstructImage = tf.nn.relu(tf.nn.bias_add(tf.nn.conv2d(fuse_5, WFinal, [1, 1, 1, 1], padding="SAME"), BFinal))
+      #  shape = tf.shape(Sampled_image)
+      #  # deconv_shape3 = tf.pack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS]) #Set shape of the final deconvlution layer (shape of image depth number of class)
+      #  W_t6 = utils.weight_variable([16, 16, Num_Channels, deconv_shape4[3].value], name="W_t6")
+      #  b_t6 = utils.bias_variable([Num_Channels], name="b_t3")
+      #  # conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+      #  conv_t6 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3,output_shape=[shape[0], shape[1], shape[2], Num_Channels], stride=8)
+      #  # FinalImage=tf.cast(conv_t3, tf.uint8,  name="ReconImage") %For 3d reconstrunction
+
+    return ReconstructImage
 
 ###########################################################################################################################################################
