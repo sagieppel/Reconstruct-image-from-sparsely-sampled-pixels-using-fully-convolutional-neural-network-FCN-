@@ -2,31 +2,26 @@ import numpy as np
 import os
 import scipy.misc as misc
 #####################################################################################################################################
-def LoadImages(ImageName,SamplingRate,Resize=False, Im_Hight=0,Im_Width=0,MaxSize=1000000): # load image and return image and sparsely sample image
+def LoadImages(ImageName,Im_Hight,Im_Width,SamplingRate): # load image and return image and sparsely sample image
     Img=misc.imread(ImageName)
-
-    H=Img.shape[0]
-    W=Img.shape[1]
     if (Img.ndim==2):
         Img=np.expand_dims(Img,3)
         Img = np.concatenate([Img, Img, Img], axis=2)
-    if Resize==True and Im_Hight>0 and Im_Width>0:
+    if Im_Hight>0 and Im_Width>0:
         Img = misc.imresize(Img, [Im_Hight,Im_Width], interp='bilinear')
-    if (H*W)>MaxSize: # if image too big shrink it to MaxSize Filters
-        ShrinkFactor=np.sqrt(np.float32(MaxSize)/(H*W))
-        Img = misc.imresize(Img, [np.int(H*ShrinkFactor), np.int(W*ShrinkFactor)], interp='bilinear')
     Img=Img[:,:,0:3]
-    SampledImage=CreateSampledImage(Img,SamplingRate)
+    SampledImage,BinarySampleMap,=CreateSampledImage(Img,SamplingRate)
     Img= np.expand_dims(Img, axis=0)
     SampledImage = np.expand_dims(SampledImage, axis=0)
-    return Img,SampledImage
+    BinarySampleMap = np.expand_dims(BinarySampleMap, axis=0)
+    return Img,SampledImage,BinarySampleMap
 
 #############################################################################################################################################
 def CreateSampledImage(I,SamplingRate): #Sparsely sample pixels from image I for training
     Sy, Sx, t = I.shape
-    SampleMap = (np.random.rand(Sy, Sx,1) < SamplingRate) #Binary map of of sampled pixels
+    SampleMap = (np.random.rand(Sy, Sx,1) <SamplingRate)
     ii = np.concatenate([SampleMap, SampleMap, SampleMap], axis=2)
     SparseIm=I.copy()
-    SparseIm[ii==False]=0 # S
-    return SparseIm,SampleMap.astype(np.float32)
+    SparseIm[ii==False]=0
+    return SparseIm,SampleMap
 #

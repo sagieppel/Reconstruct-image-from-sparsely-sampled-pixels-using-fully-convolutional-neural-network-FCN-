@@ -1,4 +1,4 @@
-#Script for training network for recosttucting image from sparsly sample pixels using valve filters
+#Script for training network for recosttucting image from sparsly sample pixels
 #Hence take image in which only small fraction of the pixels are known and reconstruct the full image
 #The unknown pixels are marked as 0
 
@@ -21,7 +21,7 @@ import scipy.misc as misc
 import random
 
 Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/validation/"# Directory with image to train
-OUTPUT_Dir="/home/sagi/Desktop/PredictionsValveFilters50k_5x5Filters/"# Directory with image to train
+OUTPUT_Dir="/home/sagi/Desktop/PredictionsValveFilters10p_10kSteps/"# Directory with image to train
 SamplingRate=0.1 # Fraction of pixels to be sampled from image for training
 
 logs_dir="logs/" # Were the trained model and all output will be put

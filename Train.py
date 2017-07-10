@@ -19,26 +19,21 @@ import os
 import scipy.misc as misc
 import random
 
-Train_Image_Dir="/media/sagi/1TB/Data_zoo/COCO/test2015/"# Directory with image to train
+Train_Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/training/"# Directory with image to train
 SamplingRate=0.1 # Fraction of pixels to be sampled from image for training
+Im_Width=400 #Width and hight to which all the images will be resized
+Im_Hight=400
 
 
-
+Batch_Size=2 # For training (number of images trained per iteration)
 logs_dir="logs/" # Were the trained model and all output will be put
+learning_rate=1e-5#Learning rate for Adam Optimizer
 Vgg_Model_Dir="Model_zoo/" #Directory of the pretrained VGG model if model not there it will be automatically download
 TrainLossTxtFile=logs_dir+"TrainLoss.txt"#
-########################################################################################################
-Batch_Size=1 # For training (number of images trained per iteration)
-learning_rate=1e-5#Learning rate for Adam Optimizer
-#######If you use batch of more then one you must set standart size for image#####################################3
-Resize=False
-ImageWidth=400
-ImageHeight=400
-if Batch_Size>1: Resize=True # if using batch size of more then one all images will be resized at training
-######################################################################################3
-MaxImageSize=300000# Maximimum number of pixel in image, larger images will be shrink
 
-MAX_ITERATION = int(200000) #Maximal training iteration
+
+
+MAX_ITERATION = int(60000) #Maximal training iteration
 
 if not os.path.exists(logs_dir): os.makedirs(logs_dir)
 
@@ -101,20 +96,15 @@ def main(argv=None):
            random.shuffle(TrainImages)  #Suffle images every epoch
            Epoch += 1
            print("Epoch "+str(Epoch)+" Completed")
-#.....................Load images for training.................................................................
-           # ---------------------if resize image before training not recommanded
-           if Resize == True:  # If resize image before training
-               batch_size = np.min([Batch_Size, len(TrainImages) - Nimg])
-               FullImages = np.zeros([batch_size, ImageHeight, ImageWidth, 3], dtype=np.int)
-               SparseSampledImages = np.zeros([batch_size, ImageHeight, ImageWidth, 3], dtype=np.int)
-               for fi in range(batch_size):
-                   FullImages[fi], SparseSampledImages[fi] = ImageReader.LoadImages(Train_Image_Dir + TrainImages[Nimg],SamplingRate, Resize=True,Im_Hight=ImageHeight,Im_Width=ImageWidth)
-                   Nimg += 1
-                   # -----------------------------------------------------------------------------------------------------------------------------------------------
-           else:
-               FullImages, SparseSampledImages = ImageReader.LoadImages(Train_Image_Dir + TrainImages[Nimg],
-                                                                        SamplingRate, MaxSize=MaxImageSize)
-               Nimg += 1
+#.....................Load images for training
+        batch_size=np.min([Batch_Size,len(TrainImages)-Nimg])
+        FullImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
+        SparseSampledImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
+        BinarySamplesMap = np.zeros([batch_size, Im_Hight, Im_Width, 1], dtype=np.int)
+        for fi in range(batch_size):
+            FullImages[fi],SparseSampledImages[fi],BinarySamplesMap[fi]=ImageReader.LoadImages(Train_Image_Dir +TrainImages[Nimg],Im_Hight,Im_Width,SamplingRate)
+            Nimg+=1
+
 
 #.......................Run one batch of training...............................................................................
         feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 0.6+np.random.rand()*0.4}# Run one cycle of traning
