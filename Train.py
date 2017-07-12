@@ -27,7 +27,7 @@ Im_Hight=0
 
 Batch_Size=1 # For training (number of images trained per iteration)
 logs_dir="logs/" # Were the trained model and all output will be put
-learning_rate=1e-6#Learning rate for Adam Optimizer
+learning_rate=4e-6#Learning rate for Adam Optimizer
 Vgg_Model_Dir="Model_zoo/" #Directory of the pretrained VGG model if model not there it will be automatically download
 TrainLossTxtFile=logs_dir+"TrainLoss.txt"#
 
@@ -111,7 +111,7 @@ def main(argv=None):
 
 
 #.......................Run one batch of training...............................................................................
-        feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 1}# Run one cycle of traning
+        feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 0.8}# Run one cycle of traning
         sess.run(train_op, feed_dict=feed_dict)
 #......................Write training set loss..........................................................................
         if itr % 10==0:

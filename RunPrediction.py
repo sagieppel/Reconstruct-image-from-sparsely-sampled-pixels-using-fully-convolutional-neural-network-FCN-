@@ -21,7 +21,7 @@ import scipy.misc as misc
 import random
 
 Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/validation/"# Directory with image to train
-OUTPUT_Dir="/home/sagi/Desktop/PredictionsValveFiltersFCNrelu12_138kSteps/"# Directory with image to train
+OUTPUT_Dir="/home/sagi/Desktop/OutputDir/"# Directory with image to train
 SamplingRate=0.1 # Fraction of pixels to be sampled from image for training
 
 logs_dir="logs/" # Were the trained model and all output will be put
