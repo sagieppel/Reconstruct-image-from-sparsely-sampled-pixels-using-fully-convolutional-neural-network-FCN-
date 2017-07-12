@@ -19,21 +19,21 @@ import os
 import scipy.misc as misc
 import random
 
-Train_Image_Dir="/media/sagi/1TB/Data_zoo/MIT_SceneParsing/ADEChallengeData2016/images/training/"# Directory with image to train
+Train_Image_Dir="/media/sagi/1TB/Data_zoo/COCO/train2014/"# Directory with image to train
 SamplingRate=0.1 # Fraction of pixels to be sampled from image for training
-Im_Width=400 #Width and hight to which all the images will be resized
-Im_Hight=400
+Im_Width=0 #Width and hight to which all the images will be resized if zero dont resize
+Im_Hight=0
 
 
-Batch_Size=2 # For training (number of images trained per iteration)
+Batch_Size=1 # For training (number of images trained per iteration)
 logs_dir="logs/" # Were the trained model and all output will be put
-learning_rate=1e-5#Learning rate for Adam Optimizer
+learning_rate=1e-6#Learning rate for Adam Optimizer
 Vgg_Model_Dir="Model_zoo/" #Directory of the pretrained VGG model if model not there it will be automatically download
 TrainLossTxtFile=logs_dir+"TrainLoss.txt"#
 
 
 
-MAX_ITERATION = int(60000) #Maximal training iteration
+MAX_ITERATION = int(400000) #Maximal training iteration
 
 if not os.path.exists(logs_dir): os.makedirs(logs_dir)
 
@@ -65,7 +65,7 @@ def main(argv=None):
     TrainImages=[]   #Train Image List
 
     TrainImages += [each for each in os.listdir(Train_Image_Dir) if each.endswith('.PNG') or each.endswith('.JPG') or each.endswith('.TIF') or each.endswith( '.GIF') or each.endswith('.png') or each.endswith('.jpg') or each.endswith('.tif') or each.endswith('.gif')]  # Get list of training images
-
+    random.shuffle(TrainImages)
 
     print('Number of  Train images='+str(len(TrainImages)))
 
@@ -97,17 +97,21 @@ def main(argv=None):
            Epoch += 1
            print("Epoch "+str(Epoch)+" Completed")
 #.....................Load images for training
-        batch_size=np.min([Batch_Size,len(TrainImages)-Nimg])
-        FullImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
-        SparseSampledImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
-        BinarySamplesMap = np.zeros([batch_size, Im_Hight, Im_Width, 1], dtype=np.int)
-        for fi in range(batch_size):
-            FullImages[fi],SparseSampledImages[fi],BinarySamplesMap[fi]=ImageReader.LoadImages(Train_Image_Dir +TrainImages[Nimg],Im_Hight,Im_Width,SamplingRate)
-            Nimg+=1
+        if Batch_Size>1:
+           batch_size=np.min([Batch_Size,len(TrainImages)-Nimg])
+           FullImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
+           SparseSampledImages = np.zeros([batch_size,Im_Hight,Im_Width,3], dtype=np.int)
+           BinarySamplesMap = np.zeros([batch_size, Im_Hight, Im_Width, 1], dtype=np.int)
+           for fi in range(batch_size):
+               FullImages[fi],SparseSampledImages[fi],BinarySamplesMap[fi]=ImageReader.LoadImages(Train_Image_Dir +TrainImages[Nimg],Im_Hight,Im_Width,SamplingRate)
+               Nimg+=1
+        else:
+               FullImages, SparseSampledImages, BinarySamplesMap = ImageReader.LoadImages(Train_Image_Dir + TrainImages[Nimg], Im_Hight, Im_Width, SamplingRate)
+               Nimg += 1
 
 
 #.......................Run one batch of training...............................................................................
-        feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 0.6+np.random.rand()*0.4}# Run one cycle of traning
+        feed_dict = {Sparse_Sampled_Image: SparseSampledImages,Binary_Point_Map:BinarySamplesMap, Full_Image: FullImages, keep_probability: 1}# Run one cycle of traning
         sess.run(train_op, feed_dict=feed_dict)
 #......................Write training set loss..........................................................................
         if itr % 10==0:
@@ -119,7 +123,7 @@ def main(argv=None):
                  f.write("\n"+str(itr)+"\t"+str(train_loss))
                  f.close()
 #....................Save Trained net (ones every 1000 training cycles...............................................
-        if itr%200==0 :
+        if itr%1000==0 :
             print("Saving Model")
             saver.save(sess, logs_dir + "model.ckpt", itr)# save trained model
 print("Finished Running")
