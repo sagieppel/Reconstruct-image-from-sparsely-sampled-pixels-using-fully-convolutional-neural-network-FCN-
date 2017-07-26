@@ -120,6 +120,6 @@ def main(argv=None):
         if itr%200==0 :
             print("Saving Model")
             saver.save(sess, logs_dir + "model.ckpt", itr)# save trained model
-print("Finished Running")
+
 if __name__ == "__main__":
     tf.app.run()
